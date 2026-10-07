@@ -38,11 +38,8 @@ def test_review_requires_confirmed_page_evidence(tmp_path):
     client = client_for(tmp_path)
     documents = scan(client)
     setup = {
-        "definition": "A funded implementation programme.",
-        "inclusion_rules": ["Must name a delivery effort"],
-        "exclusion_rules": [], "taxonomy": ["environment"],
-        "fields": [{"key": "objective", "label": "Objective", "description": "", "required": True, "value_type": "text", "options": []}],
-        "evidence_rules": ["Quote an exact Dutch page fragment"],
+        "description": "A funded implementation programme with verified evidence.",
+        "schema": {"type": "object", "properties": {"objective": {"type": "string"}}},
     }
     assert client.put("/api/program-setup", json=setup).status_code == 200
     created = client.post("/api/programs", json={"name_en": "Clean Air Programme", "classification": "environment", "field_values": {"objective": "Reduce emissions"}, "status": "draft", "confidence": "high"})
