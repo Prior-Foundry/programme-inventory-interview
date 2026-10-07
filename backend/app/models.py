@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DocumentRecord(BaseModel):
@@ -28,32 +28,19 @@ class ScanJob(BaseModel):
     error: str | None = None
 
 
-class ProgramField(BaseModel):
-    key: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
-    label: str = Field(min_length=1, max_length=120)
-    description: str = ""
-    required: bool = False
-    value_type: Literal["text", "date", "number", "list", "select"] = "text"
-    options: list[str] = Field(default_factory=list)
-
-
 class ProgramSetup(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     version: int = Field(ge=0)
-    definition: str = ""
-    inclusion_rules: list[str] = Field(default_factory=list)
-    exclusion_rules: list[str] = Field(default_factory=list)
-    taxonomy: list[str] = Field(default_factory=list)
-    fields: list[ProgramField] = Field(default_factory=list)
-    evidence_rules: list[str] = Field(default_factory=list)
+    description: str = ""
+    schema_definition: dict[str, Any] = Field(default_factory=dict, alias="schema")
 
 
 class ProgramSetupInput(BaseModel):
-    definition: str = ""
-    inclusion_rules: list[str] = Field(default_factory=list)
-    exclusion_rules: list[str] = Field(default_factory=list)
-    taxonomy: list[str] = Field(default_factory=list)
-    fields: list[ProgramField] = Field(default_factory=list)
-    evidence_rules: list[str] = Field(default_factory=list)
+    model_config = ConfigDict(populate_by_name=True)
+
+    description: str = ""
+    schema_definition: dict[str, Any] = Field(default_factory=dict, alias="schema")
 
 
 class EvidenceReference(BaseModel):

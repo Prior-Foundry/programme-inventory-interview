@@ -73,13 +73,13 @@ def create_app(
 
     @application.get("/api/program-setup", response_model=ProgramSetup)
     def get_program_setup():
-        return repository.read("program_setup", ProgramSetup(version=0).model_dump(mode="json"))
+        return repository.read("program_setup", ProgramSetup(version=0).model_dump(mode="json", by_alias=True))
 
     @application.put("/api/program-setup", response_model=ProgramSetup)
     def update_program_setup(payload: ProgramSetupInput):
-        previous = ProgramSetup.model_validate(repository.read("program_setup", ProgramSetup(version=0).model_dump(mode="json")))
-        updated = ProgramSetup(version=previous.version + 1, **payload.model_dump())
-        repository.write("program_setup", updated.model_dump(mode="json"))
+        previous = ProgramSetup.model_validate(repository.read("program_setup", ProgramSetup(version=0).model_dump(mode="json", by_alias=True)))
+        updated = ProgramSetup(version=previous.version + 1, **payload.model_dump(by_alias=True))
+        repository.write("program_setup", updated.model_dump(mode="json", by_alias=True))
         return updated
 
     @application.get("/api/programs", response_model=list[ProgramRecord])
@@ -90,8 +90,7 @@ def create_app(
     def create_program(payload: ProgramCreate):
         if payload.status == "reviewed":
             raise HTTPException(status_code=422, detail="Create a draft, add confirmed evidence, then mark it reviewed")
-        setup = ProgramSetup.model_validate(repository.read("program_setup", ProgramSetup(version=0).model_dump(mode="json")))
-        _validate_field_values(payload.field_values, setup)
+        setup = ProgramSetup.model_validate(repository.read("program_setup", ProgramSetup(version=0).model_dump(mode="json", by_alias=True)))
         record = ProgramRecord(
             id=str(uuid4()), setup_version=setup.version, created_at=now(), updated_at=now(), **payload.model_dump(),
         )
@@ -108,9 +107,6 @@ def create_app(
             raise HTTPException(status_code=404, detail="Programme not found")
         existing = ProgramRecord.model_validate(inventory[index])
         changes = payload.model_dump(exclude_unset=True)
-        if "field_values" in changes:
-            setup = ProgramSetup.model_validate(repository.read("program_setup", ProgramSetup(version=0).model_dump(mode="json")))
-            _validate_field_values(changes["field_values"], setup)
         candidate = existing.model_copy(update={**changes, "updated_at": now()})
         if candidate.status == "reviewed" and not any(item.reviewer_confirmed for item in candidate.evidence):
             raise HTTPException(status_code=422, detail="A reviewed programme needs at least one confirmed evidence reference")
@@ -149,16 +145,6 @@ def create_app(
         )
 
     return application
-
-
-def _validate_field_values(values: dict, setup: ProgramSetup) -> None:
-    configured = {field.key: field for field in setup.fields}
-    unknown = set(values) - set(configured)
-    if unknown:
-        raise HTTPException(status_code=422, detail=f"Unknown configured field(s): {', '.join(sorted(unknown))}")
-    missing = [field.key for field in configured.values() if field.required and not values.get(field.key)]
-    if missing:
-        raise HTTPException(status_code=422, detail=f"Missing required field(s): {', '.join(missing)}")
 
 
 app = create_app()

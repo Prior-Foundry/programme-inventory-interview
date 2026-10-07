@@ -4,14 +4,8 @@ export type DocumentRecord = {
   extracted_characters: number; error?: string;
 };
 
-export type ProgramField = {
-  key: string; label: string; description: string; required: boolean;
-  value_type: "text" | "date" | "number" | "list" | "select"; options: string[];
-};
-
 export type ProgramSetup = {
-  version: number; definition: string; inclusion_rules: string[]; exclusion_rules: string[];
-  taxonomy: string[]; fields: ProgramField[]; evidence_rules: string[];
+  version: number; description: string; schema: Record<string, unknown>;
 };
 
 export type Evidence = {
