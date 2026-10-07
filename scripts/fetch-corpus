@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""Fetch a versioned corpus bundle without putting 1 GB of PDFs in Git."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shutil
+import tarfile
+import tempfile
+import urllib.request
+import zipfile
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--url", help="Public bundle URL; overrides corpus.manifest.json")
+    parser.add_argument("--sha256", help="Bundle SHA-256; overrides corpus.manifest.json")
+    args = parser.parse_args()
+    manifest = json.loads((ROOT / "corpus.manifest.json").read_text())
+    url = args.url or manifest.get("bundle_url")
+    expected_hash = args.sha256 or manifest.get("sha256")
+    if not url or not expected_hash:
+        parser.error("No published bundle is configured. Set corpus.manifest.json or pass --url and --sha256.")
+    with tempfile.TemporaryDirectory() as temporary:
+        archive = Path(temporary) / "corpus.bundle"
+        print(f"Downloading {url}")
+        with urllib.request.urlopen(url) as response, archive.open("wb") as output:
+            shutil.copyfileobj(response, output)
+        actual_hash = hash_file(archive)
+        if actual_hash.lower() != expected_hash.lower():
+            raise SystemExit("Checksum mismatch; corpus was not extracted.")
+        target = ROOT / "corpus"
+        target.mkdir(exist_ok=True)
+        extract_safely(archive, target)
+    count = len(list((ROOT / "corpus").glob("*.pdf")))
+    print(f"Corpus ready: {count} PDFs in {ROOT / 'corpus'}")
+    return 0
+
+
+def hash_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def extract_safely(archive: Path, target: Path) -> None:
+    if zipfile.is_zipfile(archive):
+        with zipfile.ZipFile(archive) as bundle:
+            members = bundle.infolist()
+            _validate_names([member.filename for member in members], target)
+            bundle.extractall(target, members)
+        return
+    if tarfile.is_tarfile(archive):
+        with tarfile.open(archive) as bundle:
+            members = bundle.getmembers()
+            _validate_names([member.name for member in members], target)
+            if any(member.issym() or member.islnk() for member in members):
+                raise SystemExit("Archive links are not allowed.")
+            bundle.extractall(target, members, filter="data")
+        return
+    raise SystemExit("Bundle must be a ZIP or tar archive.")
+
+
+def _validate_names(names: list[str], target: Path) -> None:
+    root = target.resolve()
+    for name in names:
+        if not (root / name).resolve().is_relative_to(root):
+            raise SystemExit("Archive contains an unsafe path.")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

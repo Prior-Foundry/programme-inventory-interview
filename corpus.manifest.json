@@ -1,0 +1,7 @@
+{
+  "version": "pending-public-release",
+  "bundle_url": "",
+  "sha256": "",
+  "expected_file_count": 117,
+  "notes": "Set bundle_url and sha256 when publishing the versioned public corpus bundle. The application discovers the actual PDF count at scan time."
+}
